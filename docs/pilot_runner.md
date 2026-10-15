@@ -1,5 +1,27 @@
 # Qwen3-4B GSM8K pilot runner
 
+## First real smoke: compare both modes before tuning anything
+
+Once `nvidia-smi` confirms one truly free GPU (and you have permission to use it), do a 1-question functional check followed by a 5-question paired smoke. No router training or SFT at this stage.
+
+```bash
+cd /data1/lmy/SC4001-efficient-reasoning
+git pull --ff-only origin main
+PYTHONPATH=src .venv/bin/python -m unittest discover -s tests -v
+# Replace N with a physically free GPU index; do not touch busy cards.
+CUDA_VISIBLE_DEVICES=N PYTHONPATH=src .venv/bin/python scripts/run_pilot.py --limit 1
+CUDA_VISIBLE_DEVICES=N PYTHONPATH=src .venv/bin/python scripts/run_pilot.py --limit 5
+# CPU-only aggregation of the 5 real paired outputs
+PYTHONPATH=src .venv/bin/python scripts/evaluate_smoke.py --limit 5
+```
+
+Read `outputs/pilot-v1/smoke_summary_n5.json` for Fast/Slow accuracy, mean generated tokens, mean latency, paired counts, and per-question correctness; inspect full raw generation under `outputs/pilot-v1/cases/`.
+
+**Important:** Five questions are for *functional verification only*, not credible claims of model superiority. Check truncations, invalid answers, and whether `Final answer:` extraction matches the actual post-thinking output. Only if they look reasonable should you move on to a 200-question pilot. Keep the same output directory and config so valid case checkpoints are resumed.
+
+## Background
+
+
 Status: **CPU dry-run verified in isolated synthetic tests; real GPU inference has NOT been executed.**
 
 ## Goal and data
