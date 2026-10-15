@@ -1,0 +1,9 @@
+# Proposed experiment configuration. GPU runner is not yet implemented.
+model_path: /data1/lmy/models/Qwen3-4B
+dataset: data/processed/pilot.jsonl
+seed: 42
+modes: [fast, slow]
+decode:
+  do_sample: false
+  # Same cap for both modes; separately record truncation and token use.
+  max_new_tokens: 2048
