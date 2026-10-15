@@ -1,2 +1,3 @@
-# Minimal, CPU-only evaluation dependencies. Keep separate from MedDiagnose.
+# CPU-only evaluation and dry-run dependencies
 pyarrow>=16,<27
+PyYAML>=6,<7
