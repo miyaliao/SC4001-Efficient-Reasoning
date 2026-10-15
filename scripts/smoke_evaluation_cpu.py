@@ -11,7 +11,8 @@ pilot_path = root / "data/processed/pilot.jsonl"
 if not pilot_path.exists():
     raise SystemExit("Run scripts/prepare_splits.py first")
 
-samples = [json.loads(s) for s in pilot_path.read_text().splitlines() if s.strip()][:4]
+with pilot_path.open("r", encoding="utf-8", newline="") as stream:
+    samples = [json.loads(line) for _, line in zip(range(4), stream)]
 assert len(samples) == 4
 predictions = []
 
