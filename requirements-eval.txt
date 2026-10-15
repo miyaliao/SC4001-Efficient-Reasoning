@@ -1,0 +1,2 @@
+# Minimal, CPU-only evaluation dependencies. Keep separate from MedDiagnose.
+pyarrow>=16,<27
