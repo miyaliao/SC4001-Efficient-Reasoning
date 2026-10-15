@@ -28,6 +28,19 @@ uv pip install --python .venv/bin/python -r requirements-eval.txt
 PYTHONPATH=src .venv/bin/python -m unittest discover -s tests -v
 ```
 
+## Qwen3 pilot runner (GPU not required for dry-run)
+
+The paired pilot is planned on **200 GSM8K training questions** (400 fast/slow tasks). No model inference results have been collected yet.
+
+```bash
+# Only in the project's own environment:
+uv pip install --python .venv/bin/python -r requirements-eval.txt
+PYTHONPATH=src .venv/bin/python scripts/run_pilot.py --dry-run
+PYTHONPATH=src .venv/bin/python scripts/run_pilot.py --dry-run --limit 1
+```
+
+See [Pilot Runner Runbook](docs/pilot_runner.md) for GPU guardrails, resume behavior, smoke/full inference commands, and evaluation.
+
 ## Evaluate paired generations (when available)
 
 Prediction JSONL: one record per example and mode, with `id`, `mode` (`fast`/`slow`), `response`, and optionally `output_tokens`, `latency_sec`, `truncated`.
