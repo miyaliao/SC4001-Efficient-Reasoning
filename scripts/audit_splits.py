@@ -19,7 +19,8 @@ def main():
     seen = set()
     for split, count in EXPECTED.items():
         path = out_dir / f"{split}.jsonl"
-        records = [json.loads(s) for s in path.read_text().splitlines() if s.strip()]
+        with path.open("r", encoding="utf-8", newline="") as stream:
+            records = [json.loads(line) for line in stream if line.strip()]
         assert len(records) == count, (split, len(records))
         ids = []
         for item in records:
