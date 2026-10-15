@@ -43,7 +43,7 @@ def main():
         entries = [{"id": f"gsm8k-train-{i:06d}", **rows[i]} for i in indices]
         with (destination / f"{name}.jsonl").open("w", encoding="utf-8") as out:
             for entry in entries:
-                out.write(json.dumps(entry, ensure_ascii=False) + "\n")
+                out.write(json.dumps(entry, ensure_ascii=True) + "\n")
         ids_text = "\n".join(entry["id"] for entry in entries)
         manifest["splits"][name] = {
             "count": count,
