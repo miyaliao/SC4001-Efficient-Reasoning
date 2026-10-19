@@ -86,14 +86,41 @@ def atomic_jsonl(path: Path, rows: list[dict]) -> None:
             tmp.unlink(missing_ok=True)
 
 
+def case_seed(base_seed: int, sample_id: str, mode: str) -> int:
+    """Stable per-case seed: unaffected by resume order or previous generations."""
+    if type(base_seed) is not int or not VALID_ID.fullmatch(sample_id) or mode not in MODES:
+        raise ValueError("Invalid seed, sample ID, or inference mode")
+    digest = hashlib.sha256(f"{base_seed}:{sample_id}:{mode}".encode("utf-8")).digest()
+    return int.from_bytes(digest[:8], "big") & ((1 << 63) - 1)
+
+
 def run_manifest(config: dict, dataset_file: Path) -> dict:
     if dataset_file.name != "pilot.jsonl":
         raise ValueError("Pilot runner accepts only pilot.jsonl, not test or router data")
     if config.get("modes") != ["fast", "slow"]:
         raise ValueError("Pilot modes must be ['fast', 'slow']")
-    if config.get("decode", {}).get("do_sample") is not False:
-        raise ValueError("The deterministic pilot requires do_sample=false")
-    cap = config.get("decode", {}).get("max_new_tokens")
+    decode = config.get("decode", {})
+    if not isinstance(decode, dict) or decode.get("do_sample") is not True:
+        raise ValueError("Qwen3 pilot v2 requires do_sample=true")
+    sampling = decode.get("sampling")
+    if not isinstance(sampling, dict) or set(sampling) != set(MODES):
+        raise ValueError("Sampling must define exactly fast and slow mode settings")
+    for mode in MODES:
+        params = sampling[mode]
+        if not isinstance(params, dict) or set(params) != {"temperature", "top_p", "top_k", "min_p"}:
+            raise ValueError(f"Missing or extra sampling parameters for {mode}")
+        if (type(params["temperature"]) not in (int, float) or
+                not 0 < params["temperature"] <= 2):
+            raise ValueError(f"Invalid temperature for {mode}")
+        if (type(params["top_p"]) not in (int, float) or
+                not 0 < params["top_p"] <= 1):
+            raise ValueError(f"Invalid top_p for {mode}")
+        if type(params["top_k"]) is not int or params["top_k"] < 1:
+            raise ValueError(f"Invalid top_k for {mode}")
+        if (type(params["min_p"]) not in (int, float) or
+                not 0 <= params["min_p"] < 1):
+            raise ValueError(f"Invalid min_p for {mode}")
+    cap = decode.get("max_new_tokens")
     if type(cap) is not int or not 256 <= cap <= 16384:
         raise ValueError("max_new_tokens must be an integer in [256, 16384]")
     if type(config.get("seed")) is not int:
@@ -102,12 +129,14 @@ def run_manifest(config: dict, dataset_file: Path) -> dict:
     if not model.is_absolute():
         raise ValueError("model_path must be absolute")
     details = {
-        "protocol": "sc4001-pilot-v1",
+        "protocol": "sc4001-pilot-v2-sampled",
         "dataset_file": str(dataset_file.resolve()),
         "dataset_sha256": sha256_file(dataset_file),
         "model_path": str(model),
         "model_config_sha256": sha256_file(model / "config.json") if (model / "config.json").exists() else None,
         "tokenizer_config_sha256": sha256_file(model / "tokenizer_config.json") if (model / "tokenizer_config.json").exists() else None,
+        "generation_config_sha256": sha256_file(model / "generation_config.json") if (model / "generation_config.json").exists() else None,
+        "seed_scheme": "sha256(seed:sample_id:mode)-63bit",
         "modes": config["modes"],
         "seed": config["seed"],
         "decode": config["decode"],
