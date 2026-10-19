@@ -14,6 +14,8 @@ _FINAL = re.compile(
     re.IGNORECASE,
 )
 
+_QWEN_SPECIAL_TOKEN = re.compile(r"<\|[^>]*\|>")
+
 
 def normalize_number(value):
     try:
@@ -28,9 +30,24 @@ def gold_answer(text):
 
 
 def predicted_answer(text):
+    """Read a numerical final answer, never an unfinished Qwen thinking trace."""
     if not isinstance(text, str):
         return None
-    for pattern in (_GOLD, _BOXED, _FINAL):
+
+    # Ignore reasoning that may contain conflicting intermediate guesses.
+    if "</think>" in text:
+        text = text.rsplit("</think>", 1)[1]
+    elif "<think>" in text:
+        # A truncated thinking trace has no usable final answer.
+        return None
+
+    # Qwen end-of-message tokens and Markdown bold markers are not answers.
+    # Examples: "Final answer: 108<|im_end|>", "**Final answer:** 18".
+    text = _QWEN_SPECIAL_TOKEN.sub("", text)
+    text = text.replace("**", "")
+
+    # Prefer the explicit final answer to other numeric expressions.
+    for pattern in (_FINAL, _BOXED, _GOLD):
         matches = pattern.findall(text)
         if matches:
             return normalize_number(matches[-1])
