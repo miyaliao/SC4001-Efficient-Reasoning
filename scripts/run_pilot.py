@@ -104,7 +104,13 @@ def main():
     cli.add_argument("--dry-run", action="store_true", help="Plan only; no torch/model import or artifact writes")
     cli.add_argument("--limit", type=int, default=None, help="First N questions for smoke test")
     cli.add_argument("--export-only", action="store_true", help="Export complete 200-question paired results")
+    cli.add_argument("--num-shards", type=int, default=1, help="Number of disjoint question shards")
+    cli.add_argument("--shard-id", type=int, default=0, help="Zero-based shard index")
     args = cli.parse_args()
+    if args.num_shards < 1 or not 0 <= args.shard_id < args.num_shards:
+        cli.error("Require num-shards >= 1 and 0 <= shard-id < num-shards")
+    if args.export_only and (args.num_shards != 1 or args.shard_id != 0):
+        cli.error("Use unsharded --export-only after all workers complete")
 
     try:
         import yaml
@@ -119,11 +125,15 @@ def main():
     manifest = run_manifest(conf, dataset)
     output_dir = Path(args.output_dir)
     check_manifest(output_dir, manifest, create=False)
-    selection, pending, skipped = plan(samples, output_dir, manifest["fingerprint"], limit=args.limit)
+    selected = samples if args.limit is None else samples[:args.limit]
+    shard_samples = [sample for i, sample in enumerate(selected) if i % args.num_shards == args.shard_id]
+    selection, pending, skipped = plan(shard_samples, output_dir, manifest["fingerprint"])
     print(json.dumps({
         "mode": "dry-run" if args.dry_run else "export" if args.export_only else "inference",
         "fingerprint": manifest["fingerprint"],
         "selected_questions": len(selection),
+        "shard_id": args.shard_id,
+        "num_shards": args.num_shards,
         "total_tasks": len(selection) * 2,
         "complete_tasks": skipped,
         "pending_tasks": len(pending),
@@ -159,11 +169,11 @@ def main():
         print(f"[{i}/{len(pending)}] {sid} {mode}: "
               f"tokens={output['output_tokens']} truncated={output['truncated']}", flush=True)
 
-    if args.limit is None:
+    if args.limit is None and args.num_shards == 1:
         export_results(samples, output_dir, manifest["fingerprint"], complete_only=True)
         print("Full pilot exported; ready for evaluation")
     else:
-        print("Partial smoke done; NOT exported as full pilot")
+        print("Shard/partial run complete; use unsharded --export-only after all workers finish")
 
 
 if __name__ == "__main__":
