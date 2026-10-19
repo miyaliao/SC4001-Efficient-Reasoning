@@ -1,70 +1,69 @@
-# Qwen3-4B GSM8K pilot runner
+# Qwen3-4B paired GSM8K pilot: sampled v2
 
-## First real smoke: compare both modes before tuning anything
+## Why v2 (October 2026)
 
-Once `nvidia-smi` confirms one truly free GPU (and you have permission to use it), do a 1-question functional check followed by a 5-question paired smoke. No router training or SFT at this stage.
+The first 5-question smoke used greedy decoding and saved its outputs under `outputs/pilot-v1/`. That smoke established that GPU inference and Fast/Slow switching work, but it is NOT a reference baseline: Qwen3 advises **against greedy thinking decoding**. The 200-question study must use v2.
+
+For the official Qwen3-4B hybrid model, follow [Qwen3-4B sampling recommendations](https://huggingface.co/Qwen/Qwen3-4B):
+- Fast / non-thinking: do_sample=true, temperature=0.7, top_p=0.8, top_k=20, min_p=0.
+- Slow / thinking: do_sample=true, temperature=0.6, top_p=0.95, top_k=20, min_p=0.
+- Equal `max_new_tokens=4096` safety caps. This is a **pilot design choice**, NOT the manufacturer's full-length recommendation. Track truncation. Actual output length (and time) is the compute cost.
+- SHA256-derived independent seed per (base seed, sample ID, mode) makes sampling resumable without depending on generation order. We use one sampled response per mode as an exploratory feasibility study; larger experiments should check variation across seeds.
+- Prompt and local model are fixed. The mode comparison combines **thinking toggle plus Qwen's mode-specific sampling defaults**. A later same-sampler ablation can isolate the toggle if needed.
+- Fingerprints include config, data hashes, prompt, tokenizer config and generation config. Record checkpoint revision and package versions separately; fingerprint does not hash multi-GB weights.
+
+## Step 1: CPU checks (no GPU)
 
 ```bash
 cd /data1/lmy/SC4001-efficient-reasoning
+git status --short
 git pull --ff-only origin main
+.venv/bin/python scripts/preflight.py
+.venv/bin/python scripts/audit_splits.py
 PYTHONPATH=src .venv/bin/python -m unittest discover -s tests -v
-# Replace N with a physically free GPU index; do not touch busy cards.
+PYTHONPATH=src .venv/bin/python scripts/run_pilot.py --dry-run --limit 5
+```
+
+If processed splits have never been created, run `.venv/bin/python scripts/prepare_splits.py --seed 42` **once**, then audit. Do not re-split if validated files already exist. The pilot reads exactly the same 200 GSM8K training examples used previously and never accesses official test labels.
+
+`requirements-eval.txt` covers CPU-only utilities. Real GPU inference also requires a compatible CUDA-enabled torch + transformers installation inside the project's `.venv`. Verify packages before running.
+
+## Step 2: sampled v2 smoke before full pilot
+
+Check `nvidia-smi` and select a GPU that is **fully free** and available for your use. The runner intentionally refuses a target GPU with another compute process; never evict another job.
+
+```bash
+cd /data1/lmy/SC4001-efficient-reasoning
+nvidia-smi
+# Replace N with a real free physical GPU index.
 CUDA_VISIBLE_DEVICES=N PYTHONPATH=src .venv/bin/python scripts/run_pilot.py --limit 1
 CUDA_VISIBLE_DEVICES=N PYTHONPATH=src .venv/bin/python scripts/run_pilot.py --limit 5
-# CPU-only aggregation of the 5 real paired outputs
 PYTHONPATH=src .venv/bin/python scripts/evaluate_smoke.py --limit 5
 ```
 
-Read `outputs/pilot-v1/smoke_summary_n5.json` for Fast/Slow accuracy, mean generated tokens, mean latency, paired counts, and per-question correctness; inspect full raw generation under `outputs/pilot-v1/cases/`.
+Review `outputs/pilot-v2/smoke_summary_n5.json` and raw `outputs/pilot-v2/cases/` for: parsing correctness after `</think>`, invalid answers, truncation, generation token counts, finish reasons and latency. Use these five **only as a pipeline check** (not accuracy evidence).
 
-**Important:** Five questions are for *functional verification only*, not credible claims of model superiority. Check truncations, invalid answers, and whether `Final answer:` extraction matches the actual post-thinking output. Only if they look reasonable should you move on to a 200-question pilot. Keep the same output directory and config so valid case checkpoints are resumed.
+## Step 3: run the paired 200-question pilot
 
-## Background
-
-
-Status: **CPU dry-run verified in isolated synthetic tests; real GPU inference has NOT been executed.**
-
-## Goal and data
-
-Use only `data/processed/pilot.jsonl` (200 GSM8K TRAIN questions) to compare a frozen Qwen3-4B checkpoint in `fast=non-thinking` and `slow=thinking` modes. The script refuses filenames other than `pilot.jsonl` and datasets not containing exactly 200 rows. Official GSM8K test and SVAMP are not used during development.
-
-## CPU only (safe while all GPUs are busy)
+After sampled v2 smoke passes, keeping the same v2 config and output directory:
 
 ```bash
-cd /data1/lmy/SC4001-efficient-reasoning
-git pull --ff-only origin main
-uv pip install --python .venv/bin/python -r requirements-eval.txt
-.venv/bin/python scripts/audit_splits.py
-PYTHONPATH=src .venv/bin/python -m unittest discover -s tests -v
-PYTHONPATH=src .venv/bin/python scripts/run_pilot.py --dry-run
-PYTHONPATH=src .venv/bin/python scripts/run_pilot.py --dry-run --limit 1
-```
-
-The dry-run does not import torch, load model weights, use a GPU, or write any output. Expected: **200 questions, 400 tasks (two modes), 400 pending** on a fresh output directory.
-
-## GPU smoke when an exclusive free GPU is available
-
-Before starting, inspect `nvidia-smi`; NEVER evict running workloads. The runner refuses a GPU with any existing compute process according to `nvidia-smi`. Keep project dependencies separate from MedDiagnose's environment. `requirements-eval.txt` covers only CPU operation; real inference needs a compatible CUDA-enabled `torch` and `transformers` installation in the project's `.venv`. The model has not yet been loaded with this runner.
-
-```bash
-cd /data1/lmy/SC4001-efficient-reasoning
-# Replace N with a confirmed free physical GPU index. Do not type N literally.
-CUDA_VISIBLE_DEVICES=N PYTHONPATH=src .venv/bin/python scripts/run_pilot.py --limit 1
-# Inspect outputs/pilot-v1/cases/*.json for mode markers and truncation.
 CUDA_VISIBLE_DEVICES=N PYTHONPATH=src .venv/bin/python scripts/run_pilot.py
-# Only after all 400 tasks finish:
 PYTHONPATH=src .venv/bin/python scripts/run_pilot.py --export-only
-PYTHONPATH=src .venv/bin/python scripts/evaluate_pairs.py --dataset data/processed/pilot.jsonl --predictions outputs/pilot-v1/predictions.jsonl --output outputs/pilot-v1/summary.json
+PYTHONPATH=src .venv/bin/python scripts/evaluate_pairs.py \
+  --dataset data/processed/pilot.jsonl \
+  --predictions outputs/pilot-v2/predictions.jsonl \
+  --output outputs/pilot-v2/summary.json
 ```
 
-## Resume and provenance
+Each `(sample ID, mode)` is saved separately and atomically; rerunning the same command with the same fingerprint skips completed cases. Do not mix `pilot-v1` greedy artifacts with `pilot-v2` sampled results.
 
-- Successful `(sample ID, mode)` cases are saved atomically under `outputs/pilot-v1/cases/` with raw response, count of generated tokens, measured generation time, finish reason, truncation, and run fingerprint.
-- Re-run the same command after interruption: already valid checkpoints are skipped. `--limit 1` writes only 2 real outputs and does not export an incomplete pilot as a completed result.
-- The fingerprint includes dataset SHA256, local model `config.json` / `tokenizer_config.json` SHA256, seed, prompt, modes, and decoding settings. **It does not hash the full multi-GB model shards**; record the precise upstream ModelScope revision separately before any formal results.
-- Changing settings refuses to reuse existing checkpoints; start a new output directory.
-- Ground truth is never passed to the generation backend, only the question.
-- Output length uses the same `max_new_tokens` cap (currently 2048) and greedy decoding in both modes. Count and analyze truncated generations; this is a pilot setting, not a proof of optimal compute budget.
-- Real `finish_reason` behavior and correctness of response parsing for `<think>` blocks need verification on real model generations.
-- Generation latency excludes model load and input-token preprocessing. A test on a busy GPU is invalid for accurate efficiency evaluation.
-- All outputs stay git-ignored; back up experimental artifacts as needed.
+Metrics include Fast/Slow accuracy, both / fast-only / slow-only / neither counts, mean generated tokens and latency, invalid-final-answer counts, and truncation counts. Inspect per-case failures. A 200-question, single-sample study is exploratory, not an unbiased estimate of final test performance. The official GSM8K test and SVAMP remain held out.
+
+## Notes for later research
+
+- 4096 is a common maximum for both modes, **not** a matched token-cost comparison. Compare a learned router against a random/uniform routing baseline at matched actual mean cost.
+- A fixed sample seed makes results reproducible but does not eliminate sampling variance.
+- To study the causal effect of the thinking toggle alone, repeat a subset using the SAME temperature/top-p/top-k in both modes (separate fingerprint and outputs).
+- Before LoRA/SFT, keep training questions disjoint from this 200-question development sample.
+- The measured `latency_sec` includes generation/prefill but excludes model loading and input preprocessing. Avoid GPU contention when comparing timings.
