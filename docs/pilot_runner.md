@@ -67,3 +67,32 @@ Metrics include Fast/Slow accuracy, both / fast-only / slow-only / neither count
 - To study the causal effect of the thinking toggle alone, repeat a subset using the SAME temperature/top-p/top-k in both modes (separate fingerprint and outputs).
 - Before LoRA/SFT, keep training questions disjoint from this 200-question development sample.
 - The measured `latency_sec` includes generation/prefill but excludes model loading and input preprocessing. Avoid GPU contention when comparing timings.
+
+## Two-GPU data parallel execution (physical GPUs 0 and 3)
+
+Run the **same** model, dataset, seed, and output directory in both workers. `--num-shards 2` partitions by question index modulo 2; each question keeps its Fast and Slow pair on one worker. Per-case seeds are independent of shard order, and completed case checkpoints are reused. The fingerprint must match. A worker does not export incomplete results.
+
+First, confirm both GPUs are free with `nvidia-smi` and that no other compute processes are using them. To inspect planned work without loading the model:
+
+```bash
+PYTHONPATH=src .venv/bin/python scripts/run_pilot.py --dry-run --num-shards 2 --shard-id 0
+PYTHONPATH=src .venv/bin/python scripts/run_pilot.py --dry-run --num-shards 2 --shard-id 1
+```
+
+For full pilot, use two shell sessions in the same repository:
+
+```bash
+# Terminal A: GPU 0
+CUDA_VISIBLE_DEVICES=0 PYTHONPATH=src .venv/bin/python scripts/run_pilot.py --num-shards 2 --shard-id 0
+# Terminal B: GPU 3
+CUDA_VISIBLE_DEVICES=3 PYTHONPATH=src .venv/bin/python scripts/run_pilot.py --num-shards 2 --shard-id 1
+```
+
+Only **after both workers finish successfully**:
+
+```bash
+PYTHONPATH=src .venv/bin/python scripts/run_pilot.py --export-only
+PYTHONPATH=src .venv/bin/python scripts/evaluate_pairs.py --dataset data/processed/pilot.jsonl --predictions outputs/pilot-v2/predictions.jsonl --output outputs/pilot-v2/summary.json
+```
+
+Do not start an unsharded inference worker at the same time as shard workers, since it may duplicate work. Shared output is safe only when shards partition questions disjointly and configuration is identical. Generation latency per question is not equivalent to end-to-end two-GPU throughput.
