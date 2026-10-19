@@ -6,9 +6,9 @@ NTU SC4001 Neural Networks and Deep Learning — group project, 2026.
 
 ## Scope
 
-- Frozen, official post-trained Qwen3-4B in thinking and non-thinking modes.
+- Frozen, official post-trained Qwen3-4B in thinking and non-thinking modes for the paired pilot; optional SFT + adaptive routing investigated only after the feasibility study.
 - Feasibility pilot uses 200 examples from the GSM8K training split only.
-- Neural routing is conditional on pilot results; **no model inference or training has been run yet**.
+- A 5-question greedy functional smoke has been run on the server (results are local, not committed); the 200-question sampled-v2 pilot and SFT/Router experiments remain pending.
 - Official GSM8K test (1,319) and SVAMP (1,000) are evaluation-only; no threshold or architecture tuning on either.
 
 ## Local artifact paths (not committed)
@@ -30,7 +30,7 @@ PYTHONPATH=src .venv/bin/python -m unittest discover -s tests -v
 
 ## Qwen3 pilot runner (GPU not required for dry-run)
 
-The paired pilot is planned on **200 GSM8K training questions** (400 fast/slow tasks). No model inference results have been collected yet.
+The paired v2 pilot is planned on **200 GSM8K training questions** (400 sampled Fast/Slow tasks). The original 5-question greedy smoke is kept separately under `outputs/pilot-v1/`; do not reuse it in v2 results.
 
 ```bash
 # Only in the project's own environment:
@@ -48,8 +48,8 @@ Prediction JSONL: one record per example and mode, with `id`, `mode` (`fast`/`sl
 ```bash
 PYTHONPATH=src .venv/bin/python scripts/evaluate_pairs.py \
   --dataset data/processed/pilot.jsonl \
-  --predictions outputs/pilot_predictions.jsonl \
-  --output outputs/pilot_summary.json
+  --predictions outputs/pilot-v2/predictions.jsonl \
+  --output outputs/pilot-v2/summary.json
 ```
 
 The evaluation currently requires **complete paired** predictions; it deliberately refuses incomplete or duplicate IDs. Test-time labels must never be available to the inference router.
