@@ -5,7 +5,7 @@ from pathlib import Path
 
 from sc4001.pilot import (
     atomic_json, case_path, check_manifest, export_results,
-    load_examples, plan,
+    case_seed, load_examples, plan,
 )
 
 
@@ -19,6 +19,16 @@ class PilotRunnerTests(unittest.TestCase):
             {"id": "gsm8k-train-000002", "question": "What is 2?", "answer": "#### 2"},
         ]
         self.fp = "f" * 64
+
+    def test_sampling_seeds_stable_per_case(self):
+        sample_id = self.examples[0]["id"]
+        seed_fast = case_seed(42, sample_id, "fast")
+        seed_slow = case_seed(42, sample_id, "slow")
+        self.assertEqual(seed_fast, case_seed(42, sample_id, "fast"))
+        self.assertNotEqual(seed_fast, seed_slow)
+        self.assertNotEqual(seed_fast, case_seed(42, self.examples[1]["id"], "fast"))
+        with self.assertRaises(ValueError):
+            case_seed(42, sample_id, "invalid")
 
     def test_unicode_line(self):
         filename = self.base / "data.jsonl"
