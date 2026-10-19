@@ -17,6 +17,36 @@ class EvaluationTests(unittest.TestCase):
     def test_final(self):
         self.assertEqual(predicted_answer("Final answer: -3.5"), -3.5)
 
+    def test_qwen_smoke_response_formats(self):
+        # Formats observed in the first five paired Qwen3-4B generations.
+        cases = [
+            ("Final answer: 108<|im_end|>", 108),
+            ("**Final answer: 24**<|im_end|>", 24),
+            ("**Final answer: 114**<|im_end|>", 114),
+            ("**Final answer: 66**<|im_end|>", 66),
+            ("**Final answer:** 18<|im_end|>", 18),
+        ]
+        for text, expected in cases:
+            with self.subTest(response=text):
+                self.assertEqual(predicted_answer(text), expected)
+
+    def test_only_post_thinking_final_answer_counts(self):
+        response = (
+            "<think>My initial guess: Final answer: 999</think>\n"
+            "**Final answer:** 24<|im_end|>"
+        )
+        self.assertEqual(predicted_answer(response), 24)
+
+    def test_unfinished_thinking_is_invalid(self):
+        self.assertIsNone(predicted_answer("<think>Final answer: 24"))
+        self.assertIsNone(predicted_answer("<think>guess: 24</think><|im_end|>"))
+
+    def test_final_answer_priority_and_special_token(self):
+        self.assertEqual(
+            predicted_answer("#### 2\nFinal answer: 1,234.5<|im_end|>"),
+            1234.5,
+        )
+
     def test_paired_counts(self):
         samples = [
             {"id": "a", "answer": "steps\n#### 4"},
