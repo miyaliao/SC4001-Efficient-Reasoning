@@ -30,6 +30,16 @@ class PilotRunnerTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             case_seed(42, sample_id, "invalid")
 
+    def test_two_shard_partition(self):
+        examples = self.examples + [
+            {"id": "gsm8k-train-000003", "question": "3?", "answer": "#### 3"},
+        ]
+        first = [e for i, e in enumerate(examples) if i % 2 == 0]
+        second = [e for i, e in enumerate(examples) if i % 2 == 1]
+        self.assertEqual(len(first) + len(second), len(examples))
+        self.assertFalse({e["id"] for e in first} & {e["id"] for e in second})
+        self.assertEqual({e["id"] for e in first + second}, {e["id"] for e in examples})
+
     def test_unicode_line(self):
         filename = self.base / "data.jsonl"
         filename.write_text("".join(json.dumps(e, ensure_ascii=False) + "\n" for e in self.examples))
