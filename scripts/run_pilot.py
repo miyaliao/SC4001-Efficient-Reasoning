@@ -1,4 +1,4 @@
-"""Deterministic Qwen3-4B pilot; --dry-run does not import torch."""
+"""Reproducibly sampled Qwen3-4B pilot; --dry-run does not import torch."""
 from __future__ import annotations
 
 import argparse
@@ -10,7 +10,7 @@ from pathlib import Path
 
 from sc4001.pilot import (
     FINAL_INSTRUCTION, atomic_json, case_path, check_manifest,
-    export_results, load_examples, plan, run_manifest,
+    case_seed, export_results, load_examples, plan, run_manifest,
 )
 
 
@@ -56,17 +56,23 @@ class QwenBackend:
             model_path, local_files_only=True, torch_dtype=torch.bfloat16,
         ).to("cuda:0").eval()
 
-    def generate(self, question: str, mode: str, max_new_tokens: int) -> dict:
+    def generate(self, question: str, mode: str, decode: dict, sample_seed: int) -> dict:
         prompt = self.tokenizer.apply_chat_template(
             [{"role": "user", "content": FINAL_INSTRUCTION + "\n\n" + question}],
             tokenize=True, add_generation_prompt=True,
             enable_thinking=(mode == "slow"), return_tensors="pt",
         ).to("cuda:0")
+        max_new_tokens = decode["max_new_tokens"]
+        params = decode["sampling"][mode]
+        # Per-case seeding guarantees resumable sampling: order does not change a case.
+        self.torch.manual_seed(sample_seed)
         self.torch.cuda.synchronize()
         start = time.perf_counter()
         with self.torch.inference_mode():
             output = self.model.generate(
-                prompt, do_sample=False, max_new_tokens=max_new_tokens,
+                prompt, do_sample=True, max_new_tokens=max_new_tokens,
+                temperature=params["temperature"], top_p=params["top_p"],
+                top_k=params["top_k"], min_p=params["min_p"],
                 pad_token_id=self.tokenizer.pad_token_id or self.tokenizer.eos_token_id,
             )
         self.torch.cuda.synchronize()
@@ -81,6 +87,9 @@ class QwenBackend:
         truncated = len(generated) >= max_new_tokens and not ended
         return {
             "response": self.tokenizer.decode(generated, skip_special_tokens=False),
+            "prompt_tokens": int(prompt.shape[-1]),
+            "sample_seed": sample_seed,
+            "sampling_params": dict(params),
             "output_tokens": len(generated),
             "latency_sec": elapsed,
             "finish_reason": "eos" if ended else "length" if truncated else "other",
@@ -91,7 +100,7 @@ class QwenBackend:
 def main():
     cli = argparse.ArgumentParser(description=__doc__)
     cli.add_argument("--config", default="configs/pilot.yaml")
-    cli.add_argument("--output-dir", default="outputs/pilot-v1")
+    cli.add_argument("--output-dir", default="outputs/pilot-v2")
     cli.add_argument("--dry-run", action="store_true", help="Plan only; no torch/model import or artifact writes")
     cli.add_argument("--limit", type=int, default=None, help="First N questions for smoke test")
     cli.add_argument("--export-only", action="store_true", help="Export complete 200-question paired results")
@@ -141,7 +150,7 @@ def main():
 
     backend = QwenBackend(conf["model_path"], conf["seed"])
     for i, (sid, mode, question) in enumerate(pending, 1):
-        output = backend.generate(question, mode, conf["decode"]["max_new_tokens"])
+        output = backend.generate(question, mode, conf["decode"], case_seed(conf["seed"], sid, mode))
         record = {
             "id": sid, "mode": mode, "status": "ok",
             "fingerprint": manifest["fingerprint"], **output,
