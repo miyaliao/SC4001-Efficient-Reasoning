@@ -65,7 +65,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--limit", type=int, default=5)
     parser.add_argument("--config", default="configs/pilot.yaml")
-    parser.add_argument("--output-dir", default="outputs/pilot-v1")
+    parser.add_argument("--output-dir", default="outputs/pilot-v2")
     args = parser.parse_args()
     if not 1 <= args.limit <= 200:
         parser.error("--limit must be between 1 and 200")
