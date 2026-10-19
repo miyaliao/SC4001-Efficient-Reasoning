@@ -28,7 +28,10 @@ class RunnerCLITests(unittest.TestCase):
             cfg = tmp / "pilot.yaml"
             cfg.write_text(
                 f"model_path: {model}\ndataset: {data}\nseed: 42\nmodes: [fast, slow]\n"
-                "decode:\n  do_sample: false\n  max_new_tokens: 2048\n"
+                "decode:\n  do_sample: true\n  max_new_tokens: 4096\n"
+                "  sampling:\n"
+                "    fast: {temperature: 0.7, top_p: 0.8, top_k: 20, min_p: 0.0}\n"
+                "    slow: {temperature: 0.6, top_p: 0.95, top_k: 20, min_p: 0.0}\n"
             )
             dest = tmp / "outputs"
             env = dict(os.environ, PYTHONPATH=str(ROOT / "src"), CUDA_VISIBLE_DEVICES="")
