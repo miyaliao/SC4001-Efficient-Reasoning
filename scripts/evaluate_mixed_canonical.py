@@ -107,6 +107,11 @@ def score(rows, root: Path, fingerprint: str):
             values = [x[mode] for x in examples]
             result[mode] = {
                 "task_success": sum(x["correct"] for x in values) / len(values),
+                "math_accuracy_given_canonical_format": (
+                    sum(x["correct"] for x in values) /
+                    sum(x["canonical_format_ok"] for x in values)
+                    if any(x["canonical_format_ok"] for x in values) else None
+                ),
                 "canonical_format_compliance": sum(x["canonical_format_ok"] for x in values) / len(values),
                 "exact_format_compliance": sum(x["exact_format_ok"] for x in values) / len(values),
                 "exact_task_success": sum(x["exact_task_success"] for x in values) / len(values),
@@ -119,8 +124,10 @@ def score(rows, root: Path, fingerprint: str):
             }
         return result
 
+    from importlib.metadata import version
     return {
         "scorer_protocol": "canonical-boxed-v1",
+        "math_verify_version": version("math-verify"),
         "generation_fingerprint": fingerprint,
         "n": len(rows),
         "groups": {k: aggregate(v) for k, v in sorted(groups.items())},
