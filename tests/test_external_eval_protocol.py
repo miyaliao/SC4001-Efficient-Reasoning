@@ -1,5 +1,5 @@
 import unittest
-from scripts.evaluate_math_verify import final_text
+from scripts.evaluate_math_verify import final_text, extract_gsm8k_final
 from scripts.prepare_mixed_eval import build, visual_status
 
 
@@ -18,6 +18,23 @@ class ExternalEvaluationTests(unittest.TestCase):
             corrections = read_corrections(path)
             self.assertTrue(corrections[("sample1", "fast")]["correct"])
             self.assertFalse(corrections[("sample1", "slow")]["correct"])
+
+    def test_anchor_final_answer_in_display_math(self):
+        for answer in ("20", "390", "40", "200", "840", "96", "150", "324"):
+            with self.subTest(answer=answer):
+                response = (
+                    "<think>Final answer: 999</think>"
+                    "The intermediate amount is 123.\n"
+                    "### Final Answer:\n$\n"
+                    r"\text{Final answer: } " + answer + "\n$<|im_end|>"
+                )
+                self.assertEqual(extract_gsm8k_final(response), answer)
+
+    def test_anchoring_rejects_intermediate_guess(self):
+        self.assertIsNone(extract_gsm8k_final("<think>Final answer: 42"))
+        self.assertIsNone(extract_gsm8k_final("We computed 12, then 23."))
+        self.assertEqual(extract_gsm8k_final("Final answer: 20/39<|im_end|>"), "20/39")
+        self.assertEqual(extract_gsm8k_final("Final answer: 1,000<|im_end|>"), "1000")
 
     def test_final_text(self):
         self.assertEqual(final_text("<think>Final answer: 999</think>Final answer: 6<|im_end|>"),
