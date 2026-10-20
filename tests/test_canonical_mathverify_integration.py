@@ -3,10 +3,27 @@ import importlib.util
 import unittest
 
 from scripts.evaluate_mixed_canonical import math_grade
+from sc4001.boxed_scoring import canonical_box
 
 
 @unittest.skipUnless(importlib.util.find_spec("math_verify"), "math-verify missing")
 class CanonicalMathVerifyTests(unittest.TestCase):
+    def test_real_colonless_heading_wrong_answer_stays_wrong(self):
+        response = (
+            "<think>Reasoning done.</think>\n"
+            "### Final Answer\n"
+            "$$\n"
+            + r"\boxed{12}" + "\n$$<|im_end|>"
+        )
+        extracted, status, wrapper = canonical_box(response)
+        self.assertEqual((status, wrapper), ("ok", "display_dollar"))
+        self.assertEqual(extracted, r"\boxed{12}")
+        correct, parsed, _, _ = math_grade(
+            "18", extracted, "How much does six pounds cost?"
+        )
+        self.assertTrue(parsed)
+        self.assertFalse(correct)
+
     def test_plain_numeric(self):
         correct, parsed, _, special = math_grade("5200", r"\boxed{5200}", "How many?")
         self.assertTrue(correct)
