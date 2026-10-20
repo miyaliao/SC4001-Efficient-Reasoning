@@ -8,7 +8,7 @@ NTU SC4001 Neural Networks and Deep Learning — group project, 2026.
 
 - Frozen, official post-trained Qwen3-4B in thinking and non-thinking modes for the paired pilot; optional SFT + adaptive routing investigated only after the feasibility study.
 - Feasibility pilot uses 200 examples from the GSM8K training split only.
-- A 5-question greedy functional smoke has been run on the server (results are local, not committed); the 200-question sampled-v2 pilot and SFT/Router experiments remain pending.
+- A 5-question greedy functional smoke has been run on the server (results are local, not committed); the 200-question sampled-v2 pilot has since completed (user-reported); SFT/Router experiments remain pending.
 - Official GSM8K test (1,319) and SVAMP (1,000) are evaluation-only; no threshold or architecture tuning on either.
 
 ## Local artifact paths (not committed)
@@ -53,6 +53,29 @@ PYTHONPATH=src .venv/bin/python scripts/evaluate_pairs.py \
 ```
 
 The evaluation currently requires **complete paired** predictions; it deliberately refuses incomplete or duplicate IDs. Test-time labels must never be available to the inference router.
+
+
+## Mixed GSM-Plus + MATH-500 boxed format evaluation (2026-10)
+
+A frozen 160-question evaluation-only mix (80 GSM-Plus and 80 MATH-500) is prepared locally. A separate runner uses the same Qwen3-4B backend, but **a new prompt** requiring a final boxed mathematical answer. Old GSM8K results under outputs/pilot-v2 are not a matched-prompt baseline for these new results.
+
+**Always run from repo root, in module form:**
+
+    export PYTHONPATH=src:.
+    .venv/bin/python -m unittest discover -s tests -v
+    .venv/bin/python -m scripts.evaluate_mixed --gold-audit-only
+    .venv/bin/python -m scripts.run_mixed --dry-run
+
+For the 10+10 question smoke, use two eligible, free GPUs in separate terminals:
+
+    CUDA_VISIBLE_DEVICES=0 .venv/bin/python -u -m scripts.run_mixed --num-shards 2 --shard-id 0
+    CUDA_VISIBLE_DEVICES=3 .venv/bin/python -u -m scripts.run_mixed --num-shards 2 --shard-id 1
+
+Then run:
+
+    .venv/bin/python -m scripts.evaluate_mixed
+
+Read docs/mixed_boxed_pilot.md for the full runbook, strict scoring protocol, caveats, and explicit --full workflow. No real results from this new protocol have yet been verified.
 
 ## AI use
 
