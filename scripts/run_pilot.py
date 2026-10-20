@@ -56,9 +56,9 @@ class QwenBackend:
             model_path, local_files_only=True, torch_dtype=torch.bfloat16,
         ).to("cuda:0").eval()
 
-    def generate(self, question: str, mode: str, decode: dict, sample_seed: int) -> dict:
+    def generate(self, question: str, mode: str, decode: dict, sample_seed: int, instruction: str = FINAL_INSTRUCTION) -> dict:
         prompt = self.tokenizer.apply_chat_template(
-            [{"role": "user", "content": FINAL_INSTRUCTION + "\n\n" + question}],
+            [{"role": "user", "content": instruction + "\n\n" + question}],
             tokenize=True, add_generation_prompt=True,
             enable_thinking=(mode == "slow"), return_tensors="pt",
         ).to("cuda:0")
