@@ -57,7 +57,7 @@ def boxed_final(response: str) -> tuple[str | None, str]:
         return None, "unclosed_box"
     if text[end:].strip():
         return None, "trailing_content"
-    return text[start:end].replace(" ", "", 1) if False else text[start:end], "ok"
+    return text[start:end], "ok"
 
 
 def math_verify_objects(gold: str, extracted: str):
