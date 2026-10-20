@@ -68,7 +68,8 @@ def build(gsm_rows, math_rows, per_dataset=80, seed=42):
         by_level[str(row.get("level", "unknown"))].append({
             "id": f"math500-{i:04d}", "benchmark": "math_500",
             "stratum": str(row.get("level", "unknown")),
-            "topic": row.get("type"), "question": row["problem"],
+            "topic": row.get("subject", row.get("type")),
+            "unique_id": row.get("unique_id"), "question": row["problem"],
             "answer": str(row["answer"]), "source_index": i,
         })
     return gsm + balanced(by_level, per_dataset, rng)
