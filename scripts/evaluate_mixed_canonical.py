@@ -126,7 +126,7 @@ def score(rows, root: Path, fingerprint: str):
 
     from importlib.metadata import version
     return {
-        "scorer_protocol": "canonical-boxed-v1",
+        "scorer_protocol": "canonical-boxed-v2",
         "math_verify_version": version("math-verify"),
         "generation_fingerprint": fingerprint,
         "n": len(rows),
@@ -165,8 +165,8 @@ def main():
     output_dir = Path(args.output_dir)
     check_manifest(output_dir, spec, create=False)
     report = score(selected, output_dir, spec["fingerprint"])
-    destination = output_dir / ("full_canonical_summary.json" if args.full
-                                else "smoke_canonical_summary.json")
+    destination = output_dir / ("full_canonical_v2_summary.json" if args.full
+                                else "smoke_canonical_v2_summary.json")
     atomic_json(destination, report)
     print(json.dumps(report["groups"]["overall"], indent=2))
     print("Per-benchmark and per-case details:", destination)
