@@ -4,6 +4,21 @@ from scripts.prepare_mixed_eval import build, visual_status
 
 
 class ExternalEvaluationTests(unittest.TestCase):
+    def test_corrections_lookup_uses_id_and_mode(self):
+        import json
+        import tempfile
+        from pathlib import Path
+        from scripts.audit_math_verify_disagreements import read_corrections
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "audit.json"
+            path.write_text(json.dumps({"corrections": [
+                {"id": "sample1", "mode": "fast", "correct": True},
+                {"id": "sample1", "mode": "slow", "correct": False},
+            ]}))
+            corrections = read_corrections(path)
+            self.assertTrue(corrections[("sample1", "fast")]["correct"])
+            self.assertFalse(corrections[("sample1", "slow")]["correct"])
+
     def test_final_text(self):
         self.assertEqual(final_text("<think>Final answer: 999</think>Final answer: 6<|im_end|>"),
                          "Final answer: 6")
