@@ -9,7 +9,10 @@ class CanonicalBoxedTests(unittest.TestCase):
         examples = [
             (r"Final answer: \boxed{5200}", "none"),
             (r"Final answer: $\boxed{5200}$", "inline_dollar"),
-            ("### Final Answer:\n$$\n"+r"\boxed{5200}"+"\n$$", "display_dollar"),
+            ("### Final Answer:\n$\n"+r"\boxed{5200}"+"\n$", "display_dollar"),
+            ("### Final Answer\n$\n"+r"\boxed{5200}"+"\n$", "display_dollar"),
+            ("### Final Answer\n\n$\n"+r"\boxed{5200}"+"\n$", "display_dollar"),
+            ("**Final Answer**\n$\n"+r"\boxed{5200}"+"\n$", "display_dollar"),
             ("**Final answer:** "+r"\boxed{5200}", "none"),
             ("**Final answer**: "+r"\boxed{5200}", "none"),
             ("Final answer: "+r"\(\boxed{5200}\)", "inline_paren"),
@@ -41,6 +44,10 @@ class CanonicalBoxedTests(unittest.TestCase):
             r"Final answer: \boxed{24} Final answer: \boxed{25}",
             r"Final answer: \boxed{24",
             "Final answer: $"+r"\boxed{24}",
+            "### Final Answer\n$\n12\n$",
+            "### Final Answer\n$\n"+r"\boxed{12}"+"\n$ extra",
+            "### Final Answer\n$\n"+r"\boxed{12}"+"\n$\nFinal answer: "+r"\boxed{13}",
+            "Final answering: "+r"\boxed{12}",
         ]
         for case in cases:
             with self.subTest(case=case):
