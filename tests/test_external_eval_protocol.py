@@ -1,6 +1,6 @@
 import unittest
 from scripts.evaluate_math_verify import final_text
-from scripts.prepare_mixed_eval import build
+from scripts.prepare_mixed_eval import build, visual_status
 
 
 class ExternalEvaluationTests(unittest.TestCase):
@@ -9,6 +9,26 @@ class ExternalEvaluationTests(unittest.TestCase):
                          "Final answer: 6")
         self.assertEqual(final_text("<think>Final answer: 4"), "")
         self.assertIn("Final answer: 36", final_text(r"\text{Final answer: } 36"))
+
+    def test_visual_filter_distinguishes_question_and_solution(self):
+        self.assertEqual(visual_status("Find the area. [asy] draw((0,0)--(1,1)); [/asy]")[0], True)
+        self.assertEqual(visual_status(r"Find the area. \begin{tikzpicture} ...")[0], True)
+        self.assertEqual(visual_status("Use the diagram below to find x.")[1], True)
+        self.assertEqual(visual_status("A rectangle has length 4 and width 3. Find its area."),
+                         (False, False, ""))
+
+    def test_only_question_image_is_excluded(self):
+        gsm = [{"question": "q", "answer": "1", "seed_question": "seed",
+                "perturbation_type": "num"}]
+        math = [
+            {"problem": "Find the area of a 4 by 3 rectangle.", "answer": "12",
+             "level": 1, "solution": "[asy] draw(...) [/asy]"},
+            {"problem": "Find x from [asy] draw(...) [/asy]", "answer": "3",
+             "level": 1},
+        ]
+        selected = build(gsm, math, 1, 42)
+        self.assertEqual(len(selected), 2)
+        self.assertEqual([x for x in selected if x["benchmark"] == "math_500"][0]["answer"], "12")
 
     def test_sample_without_repeated_seed(self):
         gsm = [{"question": f"q{i}", "answer": str(i),
