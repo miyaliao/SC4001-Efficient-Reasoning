@@ -83,3 +83,31 @@ Commands from the repo root:
 The audit saves post-thinking response tails for noncompliant predictions and flags ambiguous Math-Verify interpretations without modifying the original results. Check whether models emitted bare boxes, normal prose, math-delimited boxes, incomplete thinking, or repeated final labels.
 
 If the prompt is revised after reviewing the audit, bump the protocol version and use a **new output directory** so it cannot reuse v1 responses with a different prompt. Repeat the 20-question smoke and verify format success before starting the 160-question evaluation.
+
+
+## Frozen scoring decision: canonical boxed v1 (2026-10-20)
+
+The generation prompt and checkpoint are unchanged from mixed-boxed-v1.
+Do NOT rerun the 20 smoke generations just because the scorer is revised.
+
+PRIMARY: canonical task success. Require a completed post-thinking final answer, exactly one final-answer label, exactly one balanced boxed expression and no substantive trailing text. Accept ordinary Markdown emphasis/heading and conventional inline/display LaTeX wrappers around the box. Then Math-Verify decides mathematical equivalence to gold. Unfinished thinking, missing/ambiguous final answer, missing box and wrong math all count as task failures.
+
+SECONDARY: exact-format compliance, exact task success, canonical format compliance, Math-Verify parse success, truncation, output tokens and latency. Standard LaTeX formatting is not counted as substantive instruction failure, but exact-format matching is still separately measured for research.
+
+Percentage questions: A bare numeric percentage output such as 36 percent can be compared with numeric gold 36 percentage points ONLY if the question explicitly asks for a percentage, recording an interpretation flag. Do not drop percentages in count questions. Manually review flagged cases. Structured MATH-500 answers (coordinates interpreted as intervals) and large integers with LaTeX digit grouping also require independent review.
+
+The new CPU-only scorer writes new files, preserving the old strict summary and all saved model generations:
+
+    cd /data1/lmy/SC4001-efficient-reasoning
+    git pull --ff-only origin main
+    export PYTHONPATH=src:.
+    .venv/bin/python -m unittest discover -s tests -v
+    .venv/bin/python -m scripts.evaluate_mixed_canonical
+    .venv/bin/python -m json.tool outputs/mixed-boxed-v1/smoke_canonical_summary.json
+
+Check per_case and review_flags before running the 160-question baseline. Use the same prompt, data, sampled decoding and seed as smoke. GPU commands remain unchanged in Step 3 above. Once both GPU workers finish:
+
+    .venv/bin/python -m scripts.run_mixed --full --export-only
+    .venv/bin/python -m scripts.evaluate_mixed_canonical --full
+
+The output is full_canonical_summary.json, grouped by benchmark and stratum. Report all metrics without pooling GSM-Plus and MATH-500 into one headline number. Do not train on these benchmark samples. If evaluation results guide method selection, document the set as exploratory rather than an untouched final test.
