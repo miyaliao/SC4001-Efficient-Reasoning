@@ -1,0 +1,19 @@
+# Mixed benchmark v1: independent of GSM8K pilot-v2, including prompt and results.
+model_path: /data1/lmy/models/Qwen3-4B
+dataset: data/processed/mixed_eval_v1.jsonl
+seed: 42
+modes: [fast, slow]
+decode:
+  do_sample: true
+  max_new_tokens: 4096
+  sampling:
+    fast:
+      temperature: 0.7
+      top_p: 0.8
+      top_k: 20
+      min_p: 0.0
+    slow:
+      temperature: 0.6
+      top_p: 0.95
+      top_k: 20
+      min_p: 0.0
