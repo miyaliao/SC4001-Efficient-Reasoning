@@ -77,6 +77,23 @@ Then run:
 
 Read docs/mixed_boxed_pilot.md for the full runbook, strict scoring protocol, caveats, and explicit --full workflow. No real results from this new protocol have yet been verified.
 
+## Canonical boxed scoring (pre-training frozen policy)
+
+The first 20-question mixed smoke kept the boxed-answer prompt but revealed standard Markdown/LaTeX formatting variants. The revised, **separately versioned** scorer accepts final-line Markdown headings/bold and paired math delimiters around an explicit boxed answer, then checks mathematical equivalence with Math-Verify. It still marks missing final box, incomplete Thinking, and wrong math as failure. Exact string-format compliance is separately reported. It preserves the original strict summary and all model generations.
+
+From repository root:
+
+    export PYTHONPATH=src:.
+    .venv/bin/python -m unittest discover -s tests -v
+    .venv/bin/python -m scripts.evaluate_mixed_canonical
+    .venv/bin/python -m json.tool outputs/mixed-boxed-v1/smoke_canonical_summary.json
+
+Once the smoke rescoring and semantic review pass, use the existing dual GPU --full workflow documented in docs/mixed_boxed_pilot.md; then run:
+
+    .venv/bin/python -m scripts.evaluate_mixed_canonical --full
+
+Do not tune scoring on SFT/RL outputs after training; save protocol, package versions, and data fingerprint.
+
 ## AI use
 
 Document model/tool-assisted ideation, coding, debugging, and editing in the final report. Review claims, test all code and report only experiments actually performed.
