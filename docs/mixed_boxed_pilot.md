@@ -64,3 +64,22 @@ The results are stored separately under outputs/mixed-boxed-v1; resumable atomic
 - Inspect fraction, coordinate, set, and symbolic LaTeX output for extraction and equivalence mistakes. Failing format is distinct from failing mathematics.
 - This mix is an exploratory evaluation set, not a training or hyperparameter tuning pool. Do not claim it is an untouched test set if it informs later design.
 - Record exact local package versions, seed, dataset SHA256, model revision, prompt and token cap. Parallel execution changes wall throughput, not single-query cost.
+
+
+## First 20-question smoke: findings and offline diagnostic
+
+The user-reported first run scored Fast 8/20 (40%) and Slow 10/20 (50%); format compliance was only Fast 11/20 and Slow 12/20, with 4 Slow truncations. Breakdown: GSM-Plus 10 (Fast 5/10, Slow 5/10) and MATH-500 10 (Fast 3/10, Slow 5/10). These are **strict-format scorer** results; they are not verified mathematical error rates, and n=10 per benchmark is not statistically conclusive.
+
+**Do not launch --full yet.** Before changing the prompt or the format acceptance rule, inspect the actual raw generations. Math-Verify also scored a case with gold 36 and parsed output 36*(1/100) as correct, and interpreted gold '(2,4)' as Interval.open(2,4). Both warrant question-aware manual review (percentage semantics and ordered-pair vs interval interpretation).
+
+Commands from the repo root:
+
+    git pull --ff-only origin main
+    export PYTHONPATH=src:.
+    .venv/bin/python -m unittest discover -s tests -v
+    .venv/bin/python -m scripts.audit_mixed_smoke
+    .venv/bin/python -m json.tool outputs/mixed-boxed-v1/smoke_format_audit.json
+
+The audit saves post-thinking response tails for noncompliant predictions and flags ambiguous Math-Verify interpretations without modifying the original results. Check whether models emitted bare boxes, normal prose, math-delimited boxes, incomplete thinking, or repeated final labels.
+
+If the prompt is revised after reviewing the audit, bump the protocol version and use a **new output directory** so it cannot reuse v1 responses with a different prompt. Repeat the 20-question smoke and verify format success before starting the 160-question evaluation.
