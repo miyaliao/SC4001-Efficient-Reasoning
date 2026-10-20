@@ -12,12 +12,12 @@ from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from statistics import mean
 
-from sc4001.boxed_scoring import canonical_box, numeric_percent_points
+from sc4001.boxed_scoring import canonical_box, final_body, numeric_percent_points
 from sc4001.mixed_protocol import (
     MODES, case_path, completed, load_mixed, manifest, selected_questions,
 )
 from sc4001.pilot import atomic_json, check_manifest
-from scripts.evaluate_mixed import audit_gold, boxed_final
+from scripts.evaluate_mixed import audit_gold
 
 
 def math_grade(gold: str, boxed: str, question: str):
@@ -58,14 +58,18 @@ def score(rows, root: Path, fingerprint: str):
             if saved is None:
                 raise ValueError(f"Missing generation for {row['id']} {mode}")
             box, status, wrapper = canonical_box(saved["response"])
-            strict_box, strict_status = boxed_final(saved["response"])
             if box is None:
                 correct, parsed, extracted, normalized_percent = False, False, [], False
             else:
                 correct, parsed, extracted, normalized_percent = math_grade(
                     row["answer"], box, row["question"])
-            strict_compliant = strict_status == "ok"
-            # Strict task success also requires a mathematically correct answer.
+            body = final_body(saved["response"])
+            last_line = body.splitlines()[-1].strip() if body else ""
+            strict_compliant = bool(
+                box is not None and wrapper == "none"
+                and last_line == "Final answer: " + box
+            )
+            # Exact-format task success also requires a mathematically correct answer.
             review_flags = []
             if normalized_percent:
                 review_flags.append("percentage_points_interpretation")
