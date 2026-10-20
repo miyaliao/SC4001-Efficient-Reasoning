@@ -73,3 +73,23 @@ Primary sources:
 - https://github.com/qtli/GSM-Plus
 - https://huggingface.co/datasets/HuggingFaceH4/MATH-500
 - https://github.com/huggingface/Math-Verify
+
+
+## Visual dependency screening (2026-10-20)
+
+The 80+80 mixed sampler now automatically excludes MATH-500 problems whose **problem text itself** contains embedded image/Asymptote/TikZ/HTML image markers. Such rows are skipped before level-balanced sampling and are replaced from the same available level pools where possible. Mere presence of [asy] in the **reference solution** is not grounds for exclusion.
+
+Possible natural-language references ("diagram below", "use the figure") are recorded with `visual_review_required=true` and listed separately in `data/processed/mixed_eval_v1.visual_review.json`. **Do not use flagged questions for GPU inference until reviewed.** For each flagged question, keep only if all necessary geometry/graph facts are contained in its problem text; otherwise exclude and replace from the same level, preserving sample size, and record IDs and reason in the manifest. This heuristic is not a guarantee that every visual-dependent question is detected. The selected set must be manually spot-checked before results are published.
+
+To rebuild deterministically using downloaded files:
+
+```bash
+git pull --ff-only origin main
+PYTHONPATH=src .venv/bin/python -m unittest discover -s tests -v
+PYTHONPATH=src .venv/bin/python scripts/prepare_mixed_eval.py \
+  --gsm-plus data/raw/gsm_plus/data/test-00000-of-00001.jsonl \
+  --math-500 data/raw/math_500/test.jsonl --per-dataset 80 --seed 42
+.venv/bin/python -m json.tool data/processed/mixed_eval_v1.visual_review.json
+```
+
+The manifest SHA256 will change due to new visual-audit fields. Do not merge responses from older sample hashes into this new set. New benchmark runner is not yet implemented.
