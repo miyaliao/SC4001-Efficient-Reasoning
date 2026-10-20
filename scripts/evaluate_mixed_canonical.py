@@ -40,6 +40,9 @@ def math_grade(gold: str, boxed: str, question: str):
     if plain_gold and plain_pred:
         result = (Decimal(str(gold).replace(",", "")) ==
                   Decimal(plain_pred.group(1).replace(",", "")))
+    elif plain_gold and (r"\%" in adjusted or "%" in adjusted) and not percent_points:
+        # An isolated percentage is not the same unit as a raw count.
+        result = False
     return result, True, [str(x) for x in pred], percent_points
 
 
@@ -63,7 +66,15 @@ def score(rows, root: Path, fingerprint: str):
                     row["answer"], box, row["question"])
             strict_compliant = strict_status == "ok"
             # Strict task success also requires a mathematically correct answer.
+            review_flags = []
+            if normalized_percent:
+                review_flags.append("percentage_points_interpretation")
+            if any("Interval." in p for p in extracted):
+                review_flags.append("interval_or_coordinate_ambiguity")
+            if str(row["answer"]).find(r"\!") >= 0:
+                review_flags.append("latex_digit_grouping")
             item = {
+                "review_flags": review_flags,
                 "correct": correct,
                 "canonical_format_ok": status == "ok",
                 "exact_format_ok": strict_compliant,
