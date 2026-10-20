@@ -1,5 +1,70 @@
 # Boxed-Answer Mixed Benchmark v1
 
+## CURRENT OFFICIAL RUN: 4096 tokens, canonical-boxed-v2
+
+This section supersedes the earlier smoke-only instructions. The model
+prompt and generation protocol are unchanged. Only the offline parser now
+accepts a colonless final-answer heading such as a Markdown header on a line
+of its own, followed by a display-math boxed answer. Standard Markdown/LaTeX
+wrappers are permitted. A single balanced final box is still mandatory.
+
+Gold 18 vs generated boxed answer 12 for GSM-Plus 008566 remains mathematically
+WRONG, even though v2 now recognizes its answer structure.
+
+Generation: existing configs/mixed.yaml specifies max_new_tokens=4096.
+Use the original outputs/mixed-boxed-v1 directory and its validated manifest.
+Saved 4096 checkpoints remain usable because prompt, dataset, seed, sampling,
+model and budget are unchanged. Never merge independent 8192 outputs.
+
+Scorer: canonical-boxed-v2. It writes smoke_canonical_v2_summary.json and
+full_canonical_v2_summary.json instead of overwriting prior v1 reports.
+Exact-format compliance is preserved as a secondary, strict final-line metric.
+
+### CPU verification before starting GPUs
+
+Run from the repository root:
+
+    cd /data1/lmy/SC4001-efficient-reasoning
+    git pull --ff-only origin main
+    export PYTHONPATH=src:.
+    grep max_new_tokens configs/mixed.yaml
+    sha256sum data/processed/mixed_eval_v1.jsonl
+    .venv/bin/python -m unittest discover -s tests -v
+    .venv/bin/python -m scripts.evaluate_mixed_canonical --gold-audit-only
+    .venv/bin/python -m scripts.evaluate_mixed_canonical
+    .venv/bin/python -m scripts.run_mixed --full --dry-run
+
+Expect 160 selected questions and 320 tasks total; with the previous complete
+4096 smoke, 40 tasks are complete and 280 pending. If manifest fingerprint
+mismatches or the gold audit fails, STOP; do not bypass a safety check.
+
+### Official GPU run
+
+GPU 3 was reported occupied. Only run on a free GPU 0. The unsharded
+full runner resumes automatically, skips existing 4096 checkpoints, and
+writes per-task files atomically:
+
+    nvidia-smi -i 0
+    PYTHONPATH=src:. CUDA_VISIBLE_DEVICES=0 .venv/bin/python -u -m scripts.run_mixed --full
+
+Do not run another writer concurrently or use GPU 3 while occupied.
+
+### CPU evaluation once GPU generation has finished
+
+    .venv/bin/python -m scripts.run_mixed --full --dry-run
+    .venv/bin/python -m scripts.run_mixed --full --export-only
+    .venv/bin/python -m scripts.evaluate_mixed_canonical --full
+
+Final v2 report: outputs/mixed-boxed-v1/full_canonical_v2_summary.json.
+Inspect each benchmark separately and all per-case review_flags. Report task
+success, format, truncation, output tokens and latency. Truncated cases without
+valid final answers stay in the denominator and count as task failures.
+The 20 smoke questions informed the budget choice: report the remaining
+140 exploratory questions independently as well.
+
+No server GPU job was initiated by this documentation change.
+
+
 ## Fixed protocol
 
 The independent evaluation dataset has 80 GSM-Plus and 80 MATH-500 questions, prepared with seed 42 and SHA256 102940cf50a34bbdcd2632b1ca836bc5dc8593879724cfcf900ade2f01a53bfd (user-reported 2026-10-20). GSM-Plus is stratified across seven perturbation categories; MATH-500 by levels 1-5. The reference prompt and model settings are frozen by a run fingerprint. Model responses and local datasets are gitignored.
