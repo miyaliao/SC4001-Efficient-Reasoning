@@ -93,3 +93,34 @@ PYTHONPATH=src .venv/bin/python scripts/prepare_mixed_eval.py \
 ```
 
 The manifest SHA256 will change due to new visual-audit fields. Do not merge responses from older sample hashes into this new set. New benchmark runner is not yet implemented.
+
+
+## Python module invocation standard (required)
+
+**Always run project scripts from the repository root**, and prefer the Python module form. This prevents `ModuleNotFoundError: No module named 'scripts'` when a script imports a sibling module.
+
+```bash
+cd /data1/lmy/SC4001-efficient-reasoning
+export PYTHONPATH=src:.
+
+# Tests
+.venv/bin/python -m unittest discover -s tests -v
+
+# Math-Verify independent scorer
+.venv/bin/python -m scripts.evaluate_math_verify
+
+# Three-way scorer audit
+.venv/bin/python -m scripts.audit_math_verify_disagreements
+
+# Mixed dataset preparation
+.venv/bin/python -m scripts.prepare_mixed_eval \
+  --gsm-plus data/raw/gsm_plus/data/test-00000-of-00001.jsonl \
+  --math-500 data/raw/math_500/test.jsonl \
+  --per-dataset 80 --seed 42
+```
+
+One-off equivalent: `PYTHONPATH=src:. .venv/bin/python -m scripts.NAME`.
+
+**Why:** `PYTHONPATH=src` exposes the `sc4001` package but does not necessarily expose the repository root when executing a file as `python scripts/name.py`. With `python -m scripts.name` from the repository root and `PYTHONPATH=src:.`, both `scripts.*` and `sc4001.*` imports resolve. Do not run from an arbitrary working directory. `-m` is for Python modules, not external shell commands.
+
+Scorer audit completed 2026-10-20: 30 unit tests passed; 200 pairs yielded corrected Fast=186/200 and Slow=187/200 versus Math-Verify Fast=183/200 and Slow=181/200, with **9 flagged disagreements**. This records *unresolved* scorer discrepancies, not adjudicated final accuracy; inspect `outputs/pilot-v2/scorer_disagreements.json` before drawing final conclusions.
