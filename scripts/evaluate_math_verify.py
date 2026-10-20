@@ -18,16 +18,66 @@ def final_text(response):
                   "Final answer:", response, flags=re.I)
 
 
+
+# GSM8K's answer contract is numerical. Extract a specifically labeled FINAL
+# number before handing the expression to Math-Verify. Parsing the full
+# narrative can interpret "$Final answer: 20$" as a multiplication of letters.
+_NUM = r"[-+]?(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?"
+_EXPLICIT_FINAL = re.compile(
+    r"final\s+answer\s*:\s*\$*\s*(" + _NUM + r"(?:\s*/\s*" + _NUM + r")?)"
+    r"(?=\s|$|[.,;!\\}])",
+    re.IGNORECASE,
+)
+
+
+def extract_gsm8k_final(response):
+    """The last explicit numerical final answer; None if absent."""
+    text = final_text(response)
+    if not text:
+        return None
+    candidates = list(_EXPLICIT_FINAL.finditer(text))
+    if not candidates:
+        return None
+    return candidates[-1].group(1).replace(",", "").replace(" ", "")
+
+
+
 def math_score(gold, response):
     from math_verify import parse, verify
     from math_verify.parser import ExprExtractionConfig, LatexExtractionConfig
+
+    reference = parse(
+        rf"\boxed{{{gold}}}",
+        extraction_config=[LatexExtractionConfig()],
+        fallback_mode="no_fallback",
+    )
     text = final_text(response)
-    reference = parse("Final answer: " + str(gold),
-                      extraction_config=[ExprExtractionConfig()],
-                      fallback_mode="no_fallback")
-    prediction = (parse(text, extraction_config=[
-                      LatexExtractionConfig(), ExprExtractionConfig()],
-                      fallback_mode="no_fallback") if text else [])
+    if not text:
+        return False, []
+
+    anchored = extract_gsm8k_final(response)
+    if anchored is not None:
+        # Math-Verify parses the isolated value, not the surrounding words.
+        # This prevents "Final answer" being interpreted as symbolic factors.
+        if "/" in anchored:
+            numerator, denominator = anchored.split("/", 1)
+            expression = rf"\boxed{{\frac{{{numerator}}}{{{denominator}}}}}"
+        else:
+            expression = rf"\boxed{{{anchored}}}"
+        prediction = parse(
+            expression, extraction_config=[LatexExtractionConfig()],
+            fallback_mode="no_fallback",
+        )
+    else:
+        # Preserve support for ordinary boxed responses lacking a final label.
+        # Do NOT parse arbitrary narrative text as an unanchored expression:
+        # an intermediate calculation could otherwise be scored as the answer.
+        boxed = re.findall(r"\\boxed\s*\{[^{}]*\}", text)
+        prediction = parse(
+            boxed[-1], extraction_config=[LatexExtractionConfig()],
+            fallback_mode="no_fallback",
+        ) if boxed else []
+
     return bool(reference and prediction and verify(reference, prediction)), prediction
 
 
