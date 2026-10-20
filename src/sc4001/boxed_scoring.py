@@ -7,7 +7,10 @@ balanced boxed expression and no substantive trailing text.
 from __future__ import annotations
 import re
 
-_FINAL = re.compile(r"(?im)^\s*(?:#{1,6}\s*)?final\s+answer\s*:")
+# Both "### Final Answer" and "Final answer:" are semantic final-answer labels.
+# Require a whole label at line start; the following content is independently
+# validated to be exactly one balanced boxed expression.
+_FINAL = re.compile(r"(?im)^[ \\t]*(?:#{1,6}[ \\t]*)?final[ \\t]+answer\\b[ \\t]*:?")
 _TOKEN = re.compile(r"<\|[^>]+\|>")
 _BOX_START = re.compile(r"^\\boxed\s*\{")
 _WRAPPERS = (("$$", "$$"), ("$", "$"), (r"\(", r"\)"), (r"\[", r"\]"))
