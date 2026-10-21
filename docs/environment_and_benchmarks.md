@@ -124,3 +124,54 @@ One-off equivalent: `PYTHONPATH=src:. .venv/bin/python -m scripts.NAME`.
 **Why:** `PYTHONPATH=src` exposes the `sc4001` package but does not necessarily expose the repository root when executing a file as `python scripts/name.py`. With `python -m scripts.name` from the repository root and `PYTHONPATH=src:.`, both `scripts.*` and `sc4001.*` imports resolve. Do not run from an arbitrary working directory. `-m` is for Python modules, not external shell commands.
 
 Scorer audit completed 2026-10-20: 30 unit tests passed; 200 pairs yielded corrected Fast=186/200 and Slow=187/200 versus Math-Verify Fast=183/200 and Slow=181/200, with **9 flagged disagreements**. This records *unresolved* scorer discrepancies, not adjudicated final accuracy; inspect `outputs/pilot-v2/scorer_disagreements.json` before drawing final conclusions.
+
+
+## ModelScope Qwen3-1.7B environment update (2026-10-21)
+
+Detailed numeric results and model-selection rationale are consolidated in
+[Experimental Results and Model Selection](experiment_results_and_model_selection.md).
+This section supersedes older statements above claiming the external benchmark runner
+is not implemented or results are pending: the 4B GSM-Plus/MATH-500 160-case baseline,
+canonical-boxed-v2 scorer, and selective 16K recovery have completed.
+
+Candidate ModelScope ID: Qwen/Qwen3-1.7B.
+Local directory: /data1/lmy/models/Qwen3-1.7B.
+The user reported the model shard files model-00001-of-00002.safetensors (~3.3G) and
+model-00002-of-00002.safetensors (~594M), model.safetensors.index.json,
+config/generation config and tokenizer assets. AutoConfig and AutoTokenizer
+successfully loaded locally: model_type qwen3; vocab_size 151643.
+
+**This is NOT yet a successful full-weight or GPU-inference test.**
+The paired mixed benchmark dry-run used local configs/mixed_1p7b.yaml and
+outputs/mixed-boxed-1p7b, saw 20 selected questions and 40 pending tasks,
+and generated fingerprint a9cdf2a754f8cb3c877310c4f634d8d59eb57514461d28a36e86a7b53d73f6b7.
+Dry run intentionally does not import torch or load weights.
+
+No direct Hugging Face connectivity is required for this model download.
+Reproducible ModelScope steps:
+
+    cd /data1/lmy/SC4001-efficient-reasoning
+    uv pip install --python .venv/bin/python -U modelscope
+    .venv/bin/modelscope download --model Qwen/Qwen3-1.7B --local_dir /data1/lmy/models/Qwen3-1.7B
+
+The new local YAML was copied from configs/mixed.yaml with only model_path changed;
+the repository does not currently track configs/mixed_1p7b.yaml, and the existing
+local file should be preserved to keep its dry-run fingerprint stable.
+
+Check the model on a free and exclusive GPU, using module invocation:
+
+    cd /data1/lmy/SC4001-efficient-reasoning
+    export PYTHONPATH=src:.
+    nvidia-smi
+    grep -E 'model_path|max_new_tokens' configs/mixed_1p7b.yaml
+    .venv/bin/python -m unittest discover -s tests -v
+    .venv/bin/python -m scripts.run_mixed --config configs/mixed_1p7b.yaml --output-dir outputs/mixed-boxed-1p7b --dry-run
+
+    # Example GPU index 2, only if actually free:
+    PYTHONPATH=src:. CUDA_VISIBLE_DEVICES=2 .venv/bin/python -u -m scripts.run_mixed --config configs/mixed_1p7b.yaml --output-dir outputs/mixed-boxed-1p7b
+
+    # CPU grading after all 20 smoke pairs:
+    .venv/bin/python -m scripts.evaluate_mixed_canonical --config configs/mixed_1p7b.yaml --output-dir outputs/mixed-boxed-1p7b
+
+This is a 20-question preliminary smoke, not yet a confirmed performance score.
+Do not override previous checkpoints or use the selected 160 mixed questions for SFT/RL training.
