@@ -2,7 +2,7 @@
 
 NTU SC4001 Neural Networks and Deep Learning — group project, 2026.
 
-**Provisional research question:** Can a learned neural router predict when a small language model benefits from extra thinking, improving accuracy at matched compute budgets?
+**Current research question:** Can post-training or adaptive compute improve mathematical task success per generated token? SFT vs RL vs router remains undecided.
 
 ## Scope
 
@@ -14,6 +14,7 @@ NTU SC4001 Neural Networks and Deep Learning — group project, 2026.
 ## Local artifact paths (not committed)
 
 - Qwen3-4B: `/data1/lmy/models/Qwen3-4B`
+- Qwen3-1.7B candidate: `/data1/lmy/models/Qwen3-1.7B` (ModelScope downloaded; config/tokenizer load verified, GPU generation pending)
 - GSM8K: `data/raw/gsm8k/{train,test}.parquet`
 - SVAMP: `data/raw/svamp/SVAMP.json`
 
@@ -75,7 +76,7 @@ Then run:
 
     .venv/bin/python -m scripts.evaluate_mixed
 
-Read docs/mixed_boxed_pilot.md for the full runbook, strict scoring protocol, caveats, and explicit --full workflow. No real results from this new protocol have yet been verified.
+Read docs/mixed_boxed_pilot.md for the full runbook. Qwen3-4B has completed the 160-question mixed baseline and a selective 16K recovery experiment; results are consolidated in [Experimental Results and Model Selection](docs/experiment_results_and_model_selection.md).
 
 ## Canonical boxed scoring (pre-training frozen policy)
 
@@ -93,6 +94,12 @@ Once the smoke rescoring and semantic review pass, use the existing dual GPU --f
     .venv/bin/python -m scripts.evaluate_mixed_canonical --full
 
 Do not tune scoring on SFT/RL outputs after training; save protocol, package versions, and data fingerprint.
+
+## Current results and Qwen3-1.7B candidate (2026-10-21)
+
+See **[Experimental Results & Model Selection](docs/experiment_results_and_model_selection.md)** for the single source of truth: GSM8K pilot, 4B mixed baseline, 4096 vs 8192 smoke, 16384 selective recovery, and 1.7B next steps. The external mixed baseline (80 GSM-Plus + 80 MATH-500; 4096 max new tokens; canonical-boxed-v2) recorded Fast **131/160 = 81.875%**, Slow **120/160 = 75%** with **25 Slow truncations**. Selective 16K recovery of those 25 truncations produced **14 correct answers**, at ~7486 generated tokens per selected case; it is *not* an all-160 16K baseline.
+
+**Qwen3-1.7B status:** ModelScope weight files are locally present, AutoConfig and AutoTokenizer load (qwen3, vocabulary 151643); a 20-question dry-run shows 40 pending generations. Full model GPU inference and mathematical results have *not* yet been tested. Use independent configuration and output folder, without modifying the 4B baseline. No SFT/RL/Router training has started.
 
 ## AI use
 
