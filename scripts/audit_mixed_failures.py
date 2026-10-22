@@ -53,7 +53,7 @@ def audit(report: dict, raw_dir: Path, dataset: Path, comparison: dict | None):
             }
         for mode in ("fast", "slow"):
             scored = case[mode]
-            raw = completed(case_path(raw_dir, sid, mode), sid, mode,
+            raw = completed(raw_dir / f"{sid}__{mode}.json", sid, mode,
                             report["generation_fingerprint"])
             if raw is None:
                 raise ValueError(f"Missing raw generation: {sid} {mode}")
