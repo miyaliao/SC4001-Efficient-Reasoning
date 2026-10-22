@@ -28,6 +28,7 @@ def main():
     p.add_argument("--baseline-config",default="configs/mixed.yaml")
     p.add_argument("--baseline-dir",default="outputs/mixed-boxed-v1")
     p.add_argument("--budget",type=int,choices=(8192,16384,32768),default=8192)
+    p.add_argument("--expected-cohort",type=int,default=25)
     p.add_argument("--output-dir",default=None)
     p.add_argument("--dry-run",action="store_true")
     p.add_argument("--evaluate-only",action="store_true")
@@ -48,8 +49,8 @@ def main():
     baseline_root=Path(args.baseline_dir)
     check_manifest(baseline_root,original,create=False)
     selected=cohort(rows,baseline_root,original)
-    if len(selected)!=25:
-        raise ValueError(f"Expected frozen 25-case baseline truncation cohort; found {len(selected)}")
+    if len(selected)!=args.expected_cohort:
+        raise ValueError(f"Expected frozen {args.expected_cohort}-case truncation cohort; found {len(selected)}")
     adjusted=json.loads(json.dumps(base_config))
     adjusted["decode"]["max_new_tokens"]=args.budget
     spec=manifest(adjusted,data_file)
